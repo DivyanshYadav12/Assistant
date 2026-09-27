@@ -1,0 +1,38 @@
+[project]
+name = "assistant-planner"
+version = "0.1.0"
+description = "Aether planner: STT, intent, skills, safety gate"
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.0",
+    "pydantic>=2.7",
+    "structlog>=24.1",
+    "pyttsx3>=2.90",
+    "pyautogui>=0.9.54",
+    "pygetwindow>=0.0.9",
+    "pyperclip>=1.8",
+    "vosk>=0.3.45",
+    "sounddevice>=0.4.6",
+    "numpy>=1.26",
+    "keyboard>=0.13.5",
+]
+
+[project.optional-dependencies]
+tts = ["piper-tts>=1.2"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
+
+[project.scripts]
+aether-planner = "assistant.core.listener:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/assistant"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true

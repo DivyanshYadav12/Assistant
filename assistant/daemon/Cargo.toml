@@ -1,0 +1,29 @@
+[package]
+name = "assistant-daemon"
+version = "0.1.0"
+edition = "2021"
+description = "Aether daemon: audio capture, wake word, hotkey, IPC to planner"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Audio capture
+cpal = "0.15"
+# Ring buffer for audio
+ringbuf = "0.4"
+# Global hotkey
+global-hotkey = "0.6"
+# Windows event loop for hotkey
+winit = "0.30"
+# IPC: JSON over named pipe / TCP localhost for MVP
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Errors
+anyhow = "1"
+
+[profile.release]
+lto = true
+strip = true

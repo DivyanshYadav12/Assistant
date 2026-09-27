@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Rust
+daemon/target/
+
+# Node / Tauri
+ui/node_modules/
+ui/dist/
+ui/src-tauri/target/
+
+# Models & data (downloaded at runtime, never committed)
+models/
+*.gguf
+*.onnx
+*.safetensors
+
+# User data (runtime data directories, not source code)
+data/memory/
+data/audit/
+data/learning/
+logs/
+config.toml
+
+# Env & secrets
+.env
+*.local
+
+# OS
+Thumbs.db
+.DS_Store

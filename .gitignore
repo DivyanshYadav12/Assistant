@@ -1,0 +1,131 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.conda/
+conda/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-*
+
+# Project specific
+assistant/planner/.venv/
+assistant/planner/data/
+assistant/planner/__pycache__/
+assistant/planner/src/__pycache__/
+assistant/planner/src/assistant/__pycache__/
+assistant/planner/src/assistant/core/__pycache__/
+assistant/planner/src/assistant/skills/__pycache__/
+assistant/planner/src/assistant/learning/__pycache__/
+
+src/__pycache__/
+src/hive/__pycache__/
+src/hive/agents/__pycache__/
+src/hive/memory/__pycache__/
+src/hive/schemas/__pycache__/
+
+# Data and models
+*.db
+*.sqlite
+*.sqlite3
+data/
+logs/
+audit/
+memory/
+embeddings/
+*.wav
+*.mp3
+*.ogg
+
+# Vosk models
+vosk-model-*/
+*.vosk
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS specific
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Model caches
+.cache/
+*.cache
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Node modules (if any web components)
+node_modules/
+
+# Build artifacts
+*.msi
+*.exe
+*.dmg
+*.pkg
+
+# Package manager
+package-lock.json
+yarn.lock
+
+# Backup files
+*.bak
+*.backup
+
+# Local development
+.local/
+local/
+
+# Hive specific
+hivechild/
