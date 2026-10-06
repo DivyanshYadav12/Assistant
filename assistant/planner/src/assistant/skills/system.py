@@ -32,7 +32,7 @@ class SystemControlSkill:
     def can_handle(self, intent: str, context: SkillContext) -> float:
         text = intent.lower()
         if any(k in text for k in (
-            "minimize", "maximise", "maximize", "close window", "focus window",
+            "minimize", "maximise", "maximize", "close window", "close", "focus window",
             "switch to", "bring to front",
         )):
             return 0.9
@@ -68,6 +68,12 @@ class SystemControlSkill:
             return self._window_action(text, "maximize", context)
         if "close window" in text or ("close" in text and "window" in text):
             return self._window_action(text, "close", context, high_risk=True)
+        # Handle "close [appname]" pattern
+        if "close" in text and not any(k in text for k in ("close window", "close all")):
+            # Extract potential app name after "close"
+            window_name = self._extract_window_name(text)
+            if window_name:  # Only if we can extract an app name
+                return self._window_action(text, "close", context, high_risk=True)
         if any(k in text for k in ("focus", "switch to", "bring to front")):
             return self._focus_window(text)
         if "show desktop" in text or "minimize all" in text or "minimise all" in text:
@@ -207,6 +213,10 @@ class SystemControlSkill:
                       "focus", "switch to", "bring to front", "window", "the", "app", "application"):
             text = text.replace(verb, "")
         text = text.strip(" .,")
+        # Handle common speech recognition errors
+        text = text.replace("note pad", "notepad")
+        text = text.replace("note bad", "notepad")
+        text = text.replace("note-pad", "notepad")
         return text if text else None
 
     # ---- Volume control ---------------------------------------------------

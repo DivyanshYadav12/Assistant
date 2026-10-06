@@ -26,12 +26,22 @@ _WORD_OPS = {
     "x": "*",  # "2 x 3"
 }
 
+# Word -> number mapping
+_WORD_NUMBERS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+    "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+    "eighteen": "18", "nineteen": "19", "twenty": "20",
+}
+
 # Pattern: number op number (op number)*  e.g. "2 + 3 * 4"
+# More flexible to handle spaces and variations
 _MATH_PATTERN = re.compile(
-    r"([-+]?\d+(?:\.\d+)?)\s*"
-    r"([+\-*/x])\s*"
+    r"([-+]?\d+(?:\.\d+)?)\s+"
+    r"([+\-*/x]|plus|minus|times|divide|multiplied|divided|add|subtract)\s+"
     r"([-+]?\d+(?:\.\d+)?)"
-    r"(?:\s*([+\-*/x])\s*([-+]?\d+(?:\.\d+)?))*",
+    r"(?:\s+([+\-*/x]|plus|minus|times|divide|multiplied|divided|add|subtract)\s+([-+]?\d+(?:\.\d+)?))*",
     re.IGNORECASE,
 )
 
@@ -39,6 +49,10 @@ _MATH_PATTERN = re.compile(
 def _words_to_symbols(expr: str) -> str:
     """Convert '2 plus 3 times 4' -> '2 + 3 * 4'."""
     expr = expr.lower().strip()
+    # Convert word numbers first
+    for word, num in sorted(_WORD_NUMBERS.items(), key=lambda x: -len(x[0])):
+        expr = expr.replace(word, num)
+    # Then convert operators
     for word, sym in sorted(_WORD_OPS.items(), key=lambda x: -len(x[0])):
         expr = expr.replace(word, sym)
     # Normalize x to *
@@ -69,31 +83,53 @@ def _format_result(value: float) -> str:
 
 def _extract_math(text: str) -> str | None:
     """Try to extract a math expression from free-form text."""
+    import structlog
+    log = structlog.get_logger()
+    
     text = text.lower().strip()
+    log.debug("math_extract_input", original=text)
 
-    # Remove filler phrases
+    # Remove filler phrases - check both start and anywhere in text
     for phrase in ("what is", "what's", "calculate", "compute",
-                   "tell me", "solve", "how much is", "the answer to"):
+                   "tell me", "solve", "how much is", "the answer to",
+                   "equals", "is equal to", "equal to", "=", "that is"):
         if text.startswith(phrase):
             text = text[len(phrase):].strip()
+        # Also remove if phrase appears anywhere
+        text = text.replace(phrase, " ")
 
-    # Remove trailing question marks
+    # Remove trailing question marks and filler words
     text = text.rstrip("?").strip()
+    for word in ("please", "okay", "thanks", "the"):
+        text = text.replace(word, "")
+    
+    log.debug("math_extract_after_cleanup", cleaned=text)
 
     # Convert word operators to symbols
     text = _words_to_symbols(text)
+    log.debug("math_extract_after_symbols", with_symbols=text)
+
+    # Clean up extra spaces
+    text = " ".join(text.split())
+    log.debug("math_extract_final", final=text)
 
     # Try direct eval
     if _safe_eval(text) is not None:
+        log.debug("math_extract_success_direct", expr=text)
         return text
 
     # Try to find a math expression pattern in the text
     match = _MATH_PATTERN.search(text)
     if match:
         candidate = match.group(0)
+        log.debug("math_extract_pattern_match", candidate=candidate)
+        # Convert any remaining word operators in the match
+        candidate = _words_to_symbols(candidate)
         if _safe_eval(candidate) is not None:
+            log.debug("math_extract_success_pattern", expr=candidate)
             return candidate
 
+    log.debug("math_extract_failed", text=text)
     return None
 
 
@@ -204,11 +240,33 @@ class MathSkill:
     def execute(self, context: SkillContext) -> SkillResult:
         text = context.user_intent
         expr = _extract_math(text)
+        
         if expr is None:
-            return SkillResult(
-                status="clarify",
-                clarification_question="What math problem should I solve?",
-            )
+            # Try to extract numbers and operators to see what's missing
+            numbers = re.findall(r"[-+]?\d+(?:\.\d+)?", text)
+            operators = re.findall(r"[+\-*/]|plus|minus|times|divide|multiplied|subtracted|add", text.lower())
+            
+            if numbers and not operators:
+                return SkillResult(
+                    status="clarify",
+                    clarification_question=f"I see the number{'s' if len(numbers) > 1 else ''} {', '.join(numbers)}. What operation should I perform? (add, subtract, multiply, or divide?)",
+                )
+            elif len(numbers) == 1 and operators:
+                return SkillResult(
+                    status="clarify",
+                    clarification_question=f"I have {numbers[0]} and want to {operators[0]}. What's the second number?",
+                )
+            elif len(numbers) >= 2 and not operators:
+                return SkillResult(
+                    status="clarify",
+                    clarification_question=f"I have numbers {', '.join(numbers)}. What operation should I perform?",
+                )
+            else:
+                return SkillResult(
+                    status="clarify",
+                    clarification_question="What math problem should I solve? Please provide the complete expression.",
+                )
+        
         result = _safe_eval(expr)
         if result is None:
             return SkillResult(

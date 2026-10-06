@@ -1,0 +1,5 @@
+export { default as Dashboard } from './Dashboard'
+export { default as Commands } from './Commands'
+export { default as Memory } from './Memory'
+export { default as Skills } from './Skills'
+export { default as Settings } from './Settings'

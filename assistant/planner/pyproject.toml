@@ -15,11 +15,19 @@ dependencies = [
     "sounddevice>=0.4.6",
     "numpy>=1.26",
     "keyboard>=0.13.5",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "websockets>=12.0",
+    "psutil>=5.9.0",
+    "pystray>=0.19.5",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
 tts = ["piper-tts>=1.2"]
 dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
+cloud = ["openai>=1.0", "anthropic>=0.18"]
 
 [project.scripts]
 aether-planner = "assistant.core.listener:main"

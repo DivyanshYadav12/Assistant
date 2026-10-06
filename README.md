@@ -161,7 +161,19 @@ cd d:\hive\src
 python -m hive serve
 ```
 
-Then say **"Computer"** or press **Win+Alt+A** to start giving commands.
+**Optional — Web Dashboard (recommended)**
+```powershell
+# Terminal 4 — Dashboard backend
+cd d:\hive\assistant\planner
+.\.venv\Scripts\python.exe -m assistant.dashboard.main
+
+# Terminal 5 — Dashboard frontend
+cd d:\hive\assistant\dashboard\frontend
+npm install
+npm run dev
+```
+
+Then say **"Computer"** or press **Win+Alt+A** to start giving commands, or access the web dashboard at `http://localhost:5173` for real-time monitoring, command history, and settings.
 
 **Enable hotkey mode** (more reliable in noisy environments):
 ```powershell

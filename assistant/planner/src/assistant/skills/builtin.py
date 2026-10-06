@@ -93,13 +93,22 @@ class TypeTextSkill:
     """Write/type text into Notepad (opens it if needed) or the focused window."""
 
     name = "type_text"
-    description = "Write or type text into Notepad or the active window"
+    description = "Write or type text into Notepad or the active window (not code)"
     risk_default = "medium"  # writes into a visible app the user is watching
 
     _VERBS = ("write", "type", "note down", "take a note", "jot down")
+    
+    # Code-related triggers that should go to CodeGenerationSkill instead
+    _CODE_TRIGGERS = ("program", "code", "function", "class", "algorithm", "logic",
+                     "script", "syntax", "loop", "variable")
 
     def can_handle(self, intent: str, context: SkillContext) -> float:
         text = intent.lower()
+        
+        # If it has code triggers, let CodeGenerationSkill handle it
+        if any(trigger in text for trigger in self._CODE_TRIGGERS):
+            return 0.0
+        
         if any(v in text for v in self._VERBS):
             return 0.92
         return 0.0

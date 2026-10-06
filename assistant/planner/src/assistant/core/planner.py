@@ -23,6 +23,7 @@ from assistant.skills.builtin import (
     TypeTextSkill,
 )
 from assistant.skills.cleanup import FileCleanupSkill
+from assistant.skills.code_generation import CodeGenerationSkill
 from assistant.skills.file_ops import FileOpsSkill, UndoSkill
 from assistant.skills.hive import HiveSkill
 from assistant.skills.math import MathSkill, NotepadSolveSkill
@@ -46,6 +47,7 @@ def build_registry() -> SkillRegistry:
     registry.register(HiveSkill())
     registry.register(SystemControlSkill())
     registry.register(FileCleanupSkill())
+    registry.register(CodeGenerationSkill())
     return registry
 
 
@@ -72,12 +74,16 @@ class Planner:
 
     def handle(self, transcript: str) -> str:
         """Process one user turn; supports multi-step commands ("X and then Y")."""
-        steps = self._split_steps(transcript)
-        if len(steps) > 1:
-            log.info("multi_step", steps=steps)
-            replies = [self._handle_step(s) for s in steps]
-            return " ".join(replies)
-        return self._handle_step(transcript)
+        try:
+            steps = self._split_steps(transcript)
+            if len(steps) > 1:
+                log.info("multi_step", steps=steps)
+                replies = [self._handle_step(s) for s in steps]
+                return " ".join(replies)
+            return self._handle_step(transcript)
+        except Exception as e:
+            log.error("handle_error", transcript=transcript, error=str(e))
+            return "I encountered an error processing your request. Please try again or rephrase your command."
 
     def _split_steps(self, transcript: str) -> list[str]:
         """Split on and/then only if EVERY part routes to a skill on its own —
@@ -92,124 +98,129 @@ class Planner:
         return parts
 
     def _handle_step(self, transcript: str) -> str:
-        context = SkillContext(user_intent=transcript, session=self.session)
+        try:
+            context = SkillContext(user_intent=transcript, session=self.session)
 
-        # Retrieve relevant memories for this intent
-        memory_hits = self.memory.retrieve(
-            transcript, top_k=5, filters={"type": ["preference", "action", "conversation"]}
-        )
-        context.session["memory_hits"] = memory_hits
-
-        # Check for explicit user rules (Tier 0)
-        rules = self._check_rules(transcript)
-        if rules:
-            for rule in rules:
-                if rule.get("block"):
-                    self.audit.append("rule_blocked", {
-                        "intent": transcript,
-                        "rule": rule["rule"],
-                    })
-                    return f"I won't do that — you told me: {rule['rule']}"
-
-        skill, confidence = self._route(transcript, context)
-        if skill is None:
-            # Fallback: human-like conversation via LLM
-            reply = self._chat_fallback(transcript)
-            # Persist conversation to memory
-            self.memory.write(
-                type="conversation",
-                content=f"User: {transcript}\nAssistant: {reply}",
-                metadata={"role": "user+assistant"},
+            # Retrieve relevant memories for this intent
+            memory_hits = self.memory.retrieve(
+                transcript, top_k=5, filters={"type": ["preference", "action", "conversation"]}
             )
-            self.audit.append("conversation", {"intent": transcript, "reply": reply[:200]})
-            return reply
+            context.session["memory_hits"] = memory_hits
 
-        risk = gate.classify_risk(transcript, skill)
-        context.risk_level = risk
-        log.info("routed", skill=skill.name, confidence=confidence, risk=risk)
+            # Check for explicit user rules (Tier 0)
+            rules = self._check_rules(transcript)
+            if rules:
+                for rule in rules:
+                    if rule.get("block"):
+                        self.audit.append("rule_blocked", {
+                            "intent": transcript,
+                            "rule": rule["rule"],
+                        })
+                        return f"I won't do that — you told me: {rule['rule']}"
 
-        result = skill.execute(context)
-
-        if result.status == "needs_approval":
-            # Check learned preferences for auto-approve (Tier 1)
-            learned_auto = self._check_learned_auto_approve(skill.name, risk)
-            if learned_auto:
-                approved = True
-                self.audit.append("learned_auto_approve", {
-                    "skill": skill.name,
-                    "preference_id": learned_auto,
-                })
-            elif gate.auto_approvable(risk, self.session):
-                approved = True
-            else:
-                # Enqueue to persistent queue (survives crash/restart)
-                approval_id = self.approval_queue.enqueue(
-                    skill=skill.name,
-                    intent=transcript,
-                    risk=risk,
-                    preview=result.approval_preview or transcript,
-                    rollback_plan=result.rollback_plan,
+            skill, confidence = self._route(transcript, context)
+            if skill is None:
+                # Fallback: human-like conversation via LLM
+                reply = self._chat_fallback(transcript)
+                # Persist conversation to memory
+                self.memory.write(
+                    type="conversation",
+                    content=f"User: {transcript}\nAssistant: {reply}",
+                    metadata={"role": "user+assistant"},
                 )
-                approved = gate.request_approval(
-                    result.approval_preview or transcript, risk
-                )
-                # Resolve in the queue
-                self.approval_queue.resolve(approval_id, approved)
-                if approved and risk == "medium":
-                    self.session["medium_approved_this_session"] = True
+                self.audit.append("conversation", {"intent": transcript, "reply": reply[:200]})
+                return reply
 
-            # Record feedback signal
-            self.feedback.record(
-                intent=transcript, skill=skill.name, confidence=confidence,
-                risk=risk, decision="approve" if approved else "reject",
-            )
-            self.audit.append("approval", {
-                "skill": skill.name, "risk": risk,
-                "approved": approved, "preview": result.approval_preview or transcript,
-            })
+            risk = gate.classify_risk(transcript, skill)
+            context.risk_level = risk
+            log.info("routed", skill=skill.name, confidence=confidence, risk=risk)
 
-            if not approved:
-                return "Okay, cancelled."
-            context.session["approved"] = True
             result = skill.execute(context)
-            context.session.pop("approved", None)
 
-        if result.rollback_plan:
-            self.session.setdefault("rollback_stack", []).append(result.rollback_plan)
+            if result.status == "needs_approval":
+                # Check learned preferences for auto-approve (Tier 1)
+                learned_auto = self._check_learned_auto_approve(skill.name, risk)
+                if learned_auto:
+                    approved = True
+                    self.audit.append("learned_auto_approve", {
+                        "skill": skill.name,
+                        "preference_id": learned_auto,
+                    })
+                elif gate.auto_approvable(risk, self.session):
+                    approved = True
+                else:
+                    # Enqueue to persistent queue (survives crash/restart)
+                    approval_id = self.approval_queue.enqueue(
+                        skill=skill.name,
+                        intent=transcript,
+                        risk=risk,
+                        preview=result.approval_preview or transcript,
+                        rollback_plan=result.rollback_plan,
+                    )
+                    approved = gate.request_approval(
+                        result.approval_preview or transcript, risk
+                    )
+                    # Resolve in the queue
+                    self.approval_queue.resolve(approval_id, approved)
+                    if approved and risk == "medium":
+                        self.session["medium_approved_this_session"] = True
 
-        reply = self._respond(result)
+                # Record feedback signal
+                self.feedback.record(
+                    intent=transcript, skill=skill.name, confidence=confidence,
+                    risk=risk, decision="approve" if approved else "reject",
+                )
+                self.audit.append("approval", {
+                    "skill": skill.name, "risk": risk,
+                    "approved": approved, "preview": result.approval_preview or transcript,
+                })
 
-        # Track conversation context
-        self.chat_history.append({"role": "user", "content": transcript})
-        self.chat_history.append({"role": "assistant", "content": reply})
+                if not approved:
+                    return "Okay, cancelled."
+                context.session["approved"] = True
+                result = skill.execute(context)
+                context.session.pop("approved", None)
 
-        # Persist action to memory + audit
-        self.memory.write(
-            type="action",
-            content=f"{skill.name}: {transcript} -> {result.status}",
-            metadata={
+            if result.rollback_plan:
+                self.session.setdefault("rollback_stack", []).append(result.rollback_plan)
+
+            reply = self._respond(result)
+
+            # Track conversation context
+            self.chat_history.append({"role": "user", "content": transcript})
+            self.chat_history.append({"role": "assistant", "content": reply})
+
+            # Persist action to memory + audit
+            self.memory.write(
+                type="action",
+                content=f"{skill.name}: {transcript} -> {result.status}",
+                metadata={
+                    "skill": skill.name,
+                    "risk": risk,
+                    "outcome": result.status,
+                    "rollback": result.rollback_plan,
+                },
+            )
+            self.audit.append("action", {
                 "skill": skill.name,
+                "intent": transcript,
                 "risk": risk,
                 "outcome": result.status,
                 "rollback": result.rollback_plan,
-            },
-        )
-        self.audit.append("action", {
-            "skill": skill.name,
-            "intent": transcript,
-            "risk": risk,
-            "outcome": result.status,
-            "rollback": result.rollback_plan,
-        })
+            })
 
-        # Record feedback signal for executed actions
-        if result.status != "needs_approval":
-            self.feedback.record(
-                intent=transcript, skill=skill.name, confidence=confidence,
-                risk=risk, decision="executed", outcome=result.status,
-            )
+            # Record feedback signal for executed actions
+            if result.status != "needs_approval":
+                self.feedback.record(
+                    intent=transcript, skill=skill.name, confidence=confidence,
+                    risk=risk, decision="executed", outcome=result.status,
+                )
 
-        return reply
+            return reply
+        
+        except Exception as e:
+            log.error("handle_step_error", transcript=transcript, error=str(e))
+            return "I encountered an error processing your request. Please try again or rephrase your command."
 
     def _check_rules(self, transcript: str) -> list[dict]:
         """Check explicit user rules (Tier 0) that might block this action."""
@@ -220,15 +231,22 @@ class Planner:
             if pref["source"] != "user":
                 continue
             rule_text = pref["rule"].lower()
-            # Simple matching: if rule contains "never" or "don't" and the intent matches the scope
+            # Only check rules that contain blocking words
             if any(w in rule_text for w in ("never", "don't", "do not", "avoid")):
-                # Check if the rule's scope keywords appear in the intent
-                scope_parts = pref["scope"].split(":")
-                for part in scope_parts:
-                    if part in text or part in rule_text:
-                        matched.append({"rule": pref["rule"], "block": True, "id": pref["id"]})
-                        self.preferences.mark_used(pref["id"])
-                        break
+                # Extract meaningful keywords from the rule (exclude blocking words and common words)
+                blocking_words = {"never", "don't", "do not", "avoid", "not"}
+                common_words = {"the", "in", "on", "at", "to", "for", "with", "and", "or", "a", "an", "is", "are", "was", "were"}
+                rule_keywords = [
+                    w for w in rule_text.split()
+                    if len(w) > 2 and w not in blocking_words and w not in common_words
+                ]
+                # Check if any meaningful rule keyword appears in the transcript
+                keyword_matches = [kw for kw in rule_keywords if kw in text]
+                # Only block if there's at least one meaningful keyword match
+                if keyword_matches:
+                    matched.append({"rule": pref["rule"], "block": True, "id": pref["id"], "matched_keywords": keyword_matches})
+                    self.preferences.mark_used(pref["id"])
+                    log.info("rule_blocked", rule=pref["rule"], matched_keywords=keyword_matches, transcript=transcript)
         return matched
 
     def _check_learned_auto_approve(self, skill_name: str, risk: str) -> str | None:

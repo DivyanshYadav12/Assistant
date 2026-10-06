@@ -422,3 +422,80 @@ Works for: file creation, file deletion, duplicate cleanup, cache cleanup. Delet
 | `AETHER_DATA_DIR` | `planner/data` | Data directory for memory/audit/learning |
 | `AETHER_ENABLE_HOTKEY` | `0` | Enable hotkey listener (set to "1" to enable) |
 | `AETHER_HOTKEY` | `win+alt+a` | Hotkey combination for voice activation |
+| `AETHER_CONVERSATION_TIMEOUT` | `0.0` | Seconds to wait for follow-up (0 = continuous listening) |
+
+---
+
+## Conversation Mode
+
+Aether stays in **conversation mode** after responding, allowing you to ask follow-up questions without saying the wake word again. This makes conversations feel more natural and human-like.
+
+### How It Works
+
+1. Say **"Computer"** to start
+2. Ask your question
+3. Aether responds
+4. **Keep talking** — Aether stays in conversation mode continuously
+5. Say **"that's all"**, **"done"**, or **"thank you"** to end conversation mode
+6. Say **"stop listening"** to quit entirely
+
+### Continuous Listening (Default)
+
+By default, Aether listens continuously once activated. It will **not time out** - you can have as long a conversation as you want without repeating the wake word.
+
+**To enable timeout (optional):**
+```powershell
+$env:AETHER_CONVERSATION_TIMEOUT="30.0"  # 30 seconds timeout
+```
+
+### Example Natural Conversation
+
+```
+You: Computer
+Aether: (chime) I'm listening.
+You: What time is it?
+Aether: It's 3:45 PM.
+You: What about tomorrow?  ← No wake word needed!
+Aether: Tomorrow will be September 29th, 2026.
+You: Is it a weekday?      ← Still in conversation mode!
+Aether: Yes, it's a Tuesday.
+You: Tell me about AI.      ← Continuous conversation!
+Aether: Artificial Intelligence is...
+You: How does ML work?     ← Still listening!
+Aether: Machine learning works by...
+You: That's all.           ← Ends conversation mode
+```
+
+### Exiting Conversation Mode
+
+Say any of these phrases to exit conversation mode:
+
+- **"That's all"**
+- **"That's it"**
+- **"Done"**
+- **"Thank you"**
+- **"Thanks"**
+
+After exiting, you'll need to use the wake word or hotkey again to start a new conversation.
+
+### Customizing Timeout (Optional)
+
+By default, timeout is disabled (continuous listening). To enable a timeout:
+
+**Environment Variable:**
+```powershell
+$env:AETHER_CONVERSATION_TIMEOUT="30.0"  # 30 seconds
+```
+
+**Via Dashboard:**
+1. Open the dashboard (http://localhost:5173)
+2. Go to Settings
+3. Adjust "Follow-up Timeout" (0 for continuous, or 5/10/15/20/30 seconds)
+
+### Benefits
+
+- **More natural**: Feels like talking to a human, not a command prompt
+- **Faster follow-ups**: No need to repeat "Computer" for every question
+- **Context retention**: Aether remembers what you were discussing
+- **Continuous**: Can have long conversations without interruption
+- **Flexible**: Customize timeout to your preference (or disable entirely)
