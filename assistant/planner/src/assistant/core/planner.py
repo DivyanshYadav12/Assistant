@@ -27,6 +27,7 @@ from assistant.skills.code_generation import CodeGenerationSkill
 from assistant.skills.file_ops import FileOpsSkill, UndoSkill
 from assistant.skills.hive import HiveSkill
 from assistant.skills.math import MathSkill, NotepadSolveSkill
+from assistant.skills.music import MusicPlaybackSkill
 from assistant.skills.system import SystemControlSkill
 from assistant.skills.web import WebSearchSkill
 
@@ -48,6 +49,7 @@ def build_registry() -> SkillRegistry:
     registry.register(SystemControlSkill())
     registry.register(FileCleanupSkill())
     registry.register(CodeGenerationSkill())
+    registry.register(MusicPlaybackSkill())
     return registry
 
 
