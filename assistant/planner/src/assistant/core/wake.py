@@ -1,8 +1,8 @@
 """Wake-word listener — say "Computer" to talk.
 
-Uses Vosk for continuous on-device speech recognition. On wake word
-detection: plays a chime, then uses Vosk to transcribe the command
-directly and sends the text to the planner — no Whisper needed.
+Uses faster-whisper for speech recognition with better accuracy than Vosk.
+On wake word detection: plays a chime, then transcribes the command
+and sends the text to the planner.
 
 Conversation Mode: After responding, Aether stays in conversation mode
 for CONVERSATION_TIMEOUT_S seconds (default 10s), allowing follow-up
@@ -16,6 +16,7 @@ Environment variables:
     AETHER_ENABLE_HOTKEY: Set to "1" to enable hotkey listener (default: off)
     AETHER_HOTKEY: Hotkey combination (default: win+alt+a)
     AETHER_CONVERSATION_TIMEOUT: Seconds to wait for follow-up (default: 10.0)
+    AETHER_WHISPER_MODEL: Model to use (default: tiny, options: tiny, base, small, medium)
 """
 
 from __future__ import annotations
@@ -32,8 +33,13 @@ from threading import Thread
 import numpy as np
 import sounddevice as sd
 import structlog
+from dotenv import load_dotenv
 
 from assistant.core.crash_handler import setup_global_crash_handler
+
+# Load .env file from project root
+project_root = Path(__file__).parent.parent.parent.parent
+load_dotenv(project_root / ".env")
 
 # Set up crash handler
 crash_handler = setup_global_crash_handler("Aether Wake Listener")

@@ -159,16 +159,23 @@ class AetherTrayApp:
         print(f"Python path: {self.venv_python}")
         print(f"Python exists: {self.venv_python.exists()}")
         
+        # Check if user wants to use Whisper (better accuracy) or Vosk (faster)
+        use_whisper = os.environ.get("AETHER_USE_WHISPER", "0") == "1"
+        wake_module = "assistant.core.wake_whisper" if use_whisper else "assistant.core.wake"
+        wake_name = "Whisper" if use_whisper else "Vosk"
+        
+        print(f"Using {wake_name} for speech recognition")
+        
         try:
             self.wake_process = subprocess.Popen(
-                [str(self.venv_python), "-m", "assistant.core.wake"],
+                [str(self.venv_python), "-m", wake_module],
                 cwd=str(self.planner_dir),
                 # Don't hide windows for now to see errors
                 # stdout=subprocess.PIPE,
                 # stderr=subprocess.PIPE,
                 # creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             )
-            print("Wake listener started")
+            print(f"Wake listener started ({wake_name})")
         except Exception as e:
             print(f"Failed to start wake listener: {e}")
             import traceback
